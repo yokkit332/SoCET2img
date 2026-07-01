@@ -42,12 +42,10 @@ module control_unit(
     always_comb begin
         counter_next = counter;
         done = '0;
-        counter_next = '0;
-        if(state == INPUT_MODE) begin
-        end
+
         // 4799 since the count starts at 0
-        // 80x60 brings us 4799
-        else if(counter == 13'd4799) begin
+        // 80x60 brings us 4800 pixels
+        if(counter == 13'd4799) begin
             counter_next = '0;
             done = '1;
         end
@@ -71,8 +69,11 @@ module control_unit(
 
     // mode and threshold combinational block
     always_comb begin
+        // lock the registers if we are not in an input state
         mode_next = mode_locked;
         threshold_next = threshold_locked;
+
+        // accept mode or threshold inputs only if we are in the input mode or threshold states
         if(state == INPUT_MODE) begin
             mode_next = mode_in;
         end
@@ -81,7 +82,7 @@ module control_unit(
         end
     end
 
-    // next state register block
+    // state register block
     always_ff @(posedge clk, negedge n_rst) begin
         if(!n_rst) begin
             state <= INPUT_MODE;
@@ -107,16 +108,8 @@ module control_unit(
     always_comb begin
         output_ready = '0;
         case(state) 
-            INPUT_MODE: begin end
-
-            INPUT_THRESHOLD: begin end
-
-            STREAM: begin
-                if(r_ready & g_ready & b_ready) begin
-                    output_ready = '1;
-                end
-            end
-
+            // in stream state, assert output_ready if the rgb uart bytes have all been shifted in
+            STREAM: output_ready = r_ready & g_ready & b_ready;
             default: output_ready = '0;
         endcase
     end
