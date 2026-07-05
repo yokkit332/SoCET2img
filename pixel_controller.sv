@@ -18,39 +18,40 @@ module control_unit(
 
     // INTERNAL SIGNAL DECLARATIONS
 
-    // done signal to detect when we finish streaming
-    logic done;
-
     // mode and threshold
     logic [2:0] mode_next;
     logic [4:0] threshold_next;
 
-    // counter
-    logic [12:0] counter, counter_next;
+    // counter to determine when we finish streaming pixels
+    logic [12:0] pixelCount, pixelCount_next;
+
+    // rollover flag to determine when we finish streaming pixels
+    logic rollover, rollover_next;
 
     // counter register block
     always_ff @(posedge clk, negedge n_rst) begin
         if(!n_rst) begin
-            counter <= '0;
+            pixelCount <= '0;
+            rollover <= '0;
         end
         else begin
-            counter <= counter_next;
+            pixelCount <= pixelCount_next;
+            rollover <= rollover_next;
         end
     end
 
     // counter combinational block
     always_comb begin
-        counter_next = counter;
-        done = '0;
-
+        pixelCount_next = pixelCount;
+        rollover_next = '0;
         // 4799 since the count starts at 0
-        // 80x60 brings us 4800 pixels
-        if(counter == 13'd4799) begin
-            counter_next = '0;
-            done = '1;
+        // 80x60 brings us 4800 pixels, but transition at 4799 b/c we start at 0
+        if(pixelCount == 13'd4799) begin
+            pixelCount_next = '0;
+            rollover_next = '1;
         end
         else if(output_ready) begin
-            counter_next = counter + 13'd1;
+            pixelCount_next = pixelCount + 13'b1;
         end
         
     end
@@ -99,14 +100,13 @@ module control_unit(
         case(state) 
             INPUT_MODE: next_state = confirm ? INPUT_THRESHOLD : INPUT_MODE;
             INPUT_THRESHOLD: next_state = confirm ? STREAM : INPUT_THRESHOLD;
-            STREAM: next_state = done ? INPUT_MODE : STREAM;
+            STREAM: next_state = (rollover) ? INPUT_MODE : STREAM;
             default: next_state = INPUT_MODE;
         endcase
     end
 
     // output logic block
     always_comb begin
-        output_ready = '0;
         case(state) 
             // in stream state, assert output_ready if the rgb uart bytes have all been shifted in
             STREAM: output_ready = r_ready & g_ready & b_ready;
