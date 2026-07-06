@@ -1,57 +1,77 @@
 `timescale 1ns / 1ps
 
-module tb_pixel_accelerator;
+module pixel_accelerator (
+  
+    input wire [7:0] r_in,
+    input wire [7:0] g_in,
+    input wire [7:0] b_in,
+    
+    input wire [2:0] mode_locked,
+    input wire [4:0] threshold_locked,
 
-    reg  [7:0] r_in, g_in, b_in;
-    reg  [2:0] mode_locked;
-    reg  [4:0] threshold_locked;
-
-    wire [7:0] r_out, g_out, b_out;
-
-    pixel_accelerator dut (
-        .r_in             (r_in),
-        .g_in             (g_in),
-        .b_in             (b_in),
-        .mode_locked      (mode_locked),
-        .threshold_locked (threshold_locked),
-        .r_out            (r_out),
-        .g_out            (g_out),
-        .b_out            (b_out)
-    );
-
-    initial begin
-
-        $display("=== Test 1: Pass-through ===");
-        mode_locked = 3'b000; threshold_locked = 5'd0;
-        r_in = 8'd100; g_in = 8'd150; b_in = 8'd200; #10;
-        $display("R IN:%0d OUT:%0d EXP:100 %s", r_in, r_out, (r_out==100)?"PASS":"FAIL");
-        $display("G IN:%0d OUT:%0d EXP:150 %s", g_in, g_out, (g_out==150)?"PASS":"FAIL");
-        $display("B IN:%0d OUT:%0d EXP:200 %s", b_in, b_out, (b_out==200)?"PASS":"FAIL");
-
-        $display("=== Test 2: Inverter ===");
-        mode_locked = 3'b001; threshold_locked = 5'd0;
-        r_in = 8'd0; g_in = 8'd128; b_in = 8'd255; #10;
-        $display("R IN:%0d OUT:%0d EXP:255 %s", r_in, r_out, (r_out==255)?"PASS":"FAIL");
-        $display("G IN:%0d OUT:%0d EXP:127 %s", g_in, g_out, (g_out==127)?"PASS":"FAIL");
-        $display("B IN:%0d OUT:%0d EXP:0   %s", b_in, b_out, (b_out==0)?"PASS":"FAIL");
-
-        $display("=== Test 3: Brighten (threshold=30) ===");
-        mode_locked = 3'b010; threshold_locked = 5'd30;
-        r_in = 8'd100; g_in = 8'd200; b_in = 8'd240; #10;
-        $display("R IN:%0d OUT:%0d EXP:130 %s", r_in, r_out, (r_out==130)?"PASS":"FAIL");
-        $display("G IN:%0d OUT:%0d EXP:230 %s", g_in, g_out, (g_out==230)?"PASS":"FAIL");
-        $display("B IN:%0d OUT:%0d EXP:255 %s", b_in, b_out, (b_out==255)?"PASS":"FAIL");
+    output reg [7:0] r_out,
+    output reg [7:0] g_out,
+    output reg [7:0] b_out
 
 
-        $display("=== Test 4: Darken (threshold=30) ===");
-        mode_locked = 3'b011; threshold_locked = 5'd30;
-        r_in = 8'd100; g_in = 8'd20; b_in = 8'd200; #10;
-        $display("R IN:%0d OUT:%0d EXP:70  %s", r_in, r_out, (r_out==70)?"PASS":"FAIL");
-        $display("G IN:%0d OUT:%0d EXP:0   %s", g_in, g_out, (g_out==0)?"PASS":"FAIL");
-        $display("B IN:%0d OUT:%0d EXP:170 %s", b_in, b_out, (b_out==170)?"PASS":"FAIL");
+);
 
-        $display("=== All tests done ===");
-        $finish;
+    localparam MODE_PASSTHROUGH = 3'b000;
+    localparam MODE_INVERTER    = 3'b001;
+    localparam MODE_BRIGHTEN    = 3'b010;
+    localparam MODE_DARKEN      = 3'b011;
+
+  	wire [8:0] r_brighten, g_brighten, b_brighten;
+    wire [8:0] r_darken, g_darken, b_darken;
+
+
+
+//    assign brighten_result = {2'b00, pixel_in} + {5'b0, threshold};
+    assign r_brighten = {1'b0, r_in} + {4'b0, threshold_locked};
+    assign g_brighten = {1'b0, g_in} + {4'b0, threshold_locked};
+    assign b_brighten = {1'b0, b_in} + {4'b0, threshold_locked};
+
+
+//    assign darken_result   = {2'b00, pixel_in} - {5'b0, threshold};
+    assign r_darken = {1'b0, r_in} - {4'b0, threshold_locked};
+    assign g_darken = {1'b0, g_in} - {4'b0, threshold_locked};
+    assign b_darken = {1'b0, b_in} - {4'b0, threshold_locked};
+    
+
+
+    always @(*) begin
+        case (mode_locked)
+            MODE_PASSTHROUGH: begin
+                r_out = r_in;
+                g_out = g_in;
+                b_out = b_in;
+            end
+
+            MODE_INVERTER: begin
+                r_out = 8'd255 - r_in;
+                g_out = 8'd255 - g_in;
+                b_out = 8'd255 - b_in;
+            end
+
+            MODE_BRIGHTEN: begin
+                r_out = (r_brighten > 9'd255) ? 8'd255 : r_brighten[7:0];
+              g_out = (g_brighten > 9'd255) ? 8'd255 : g_brighten[7:0];
+                b_out = (b_brighten > 9'd255) ? 8'd255 : b_brighten[7:0];
+            end
+
+            MODE_DARKEN: begin
+                r_out = (r_darken[8]) ? 8'd0 : r_darken[7:0];
+                g_out = (g_darken[8]) ? 8'd0 : g_darken[7:0];
+                b_out = (b_darken[8]) ? 8'd0 : b_darken[7:0];
+
+            end
+
+            default: begin
+                r_out = r_in;
+                g_out = g_in;
+                b_out = b_in;
+            end
+        endcase
     end
 
 endmodule
