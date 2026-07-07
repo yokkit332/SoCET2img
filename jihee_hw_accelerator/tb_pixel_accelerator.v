@@ -18,7 +18,9 @@ module tb_pixel_accelerator;
     );
 
     initial begin
-
+        // ------------------------------------------------
+        // Test 1: Pass-through (mode 000)
+        // ------------------------------------------------
         $display("=== Test 1: Pass-through ===");
         mode_locked = 3'b000; threshold_locked = 5'd0;
         r_in = 8'd100; g_in = 8'd150; b_in = 8'd200; #10;
@@ -26,7 +28,9 @@ module tb_pixel_accelerator;
         $display("G IN:%0d OUT:%0d EXP:150 %s", g_in, g_out, (g_out==150)?"PASS":"FAIL");
         $display("B IN:%0d OUT:%0d EXP:200 %s", b_in, b_out, (b_out==200)?"PASS":"FAIL");
 
-
+        // ------------------------------------------------
+        // Test 2: Inverter (mode 001)
+        // ------------------------------------------------
         $display("=== Test 2: Inverter ===");
         mode_locked = 3'b001; threshold_locked = 5'd0;
         r_in = 8'd0; g_in = 8'd128; b_in = 8'd255; #10;
@@ -34,7 +38,9 @@ module tb_pixel_accelerator;
         $display("G IN:%0d OUT:%0d EXP:127 %s", g_in, g_out, (g_out==127)?"PASS":"FAIL");
         $display("B IN:%0d OUT:%0d EXP:0   %s", b_in, b_out, (b_out==0)?"PASS":"FAIL");
 
-
+        // ------------------------------------------------
+        // Test 3: Brighten (mode 010, threshold=30)
+        // ------------------------------------------------
         $display("=== Test 3: Brighten (threshold=30) ===");
         mode_locked = 3'b010; threshold_locked = 5'd30;
         r_in = 8'd100; g_in = 8'd200; b_in = 8'd240; #10;
@@ -42,6 +48,9 @@ module tb_pixel_accelerator;
         $display("G IN:%0d OUT:%0d EXP:230 %s", g_in, g_out, (g_out==230)?"PASS":"FAIL");
         $display("B IN:%0d OUT:%0d EXP:255 %s", b_in, b_out, (b_out==255)?"PASS":"FAIL");
 
+        // ------------------------------------------------
+        // Test 4: Darken (mode 011, threshold=30)
+        // ------------------------------------------------
         $display("=== Test 4: Darken (threshold=30) ===");
         mode_locked = 3'b011; threshold_locked = 5'd30;
         r_in = 8'd100; g_in = 8'd20; b_in = 8'd200; #10;
@@ -49,7 +58,11 @@ module tb_pixel_accelerator;
         $display("G IN:%0d OUT:%0d EXP:0   %s", g_in, g_out, (g_out==0)?"PASS":"FAIL");
         $display("B IN:%0d OUT:%0d EXP:170 %s", b_in, b_out, (b_out==170)?"PASS":"FAIL");
 
-
+        // ------------------------------------------------
+        // Test 5: Grayscale (mode 100)
+        // Gray ≈ 0.299*R + 0.587*G + 0.114*B
+        // R=100, G=150, B=200 → approx gray = 141
+        // ------------------------------------------------
         $display("=== Test 5: Grayscale ===");
         mode_locked = 3'b100; threshold_locked = 5'd0;
         r_in = 8'd100; g_in = 8'd150; b_in = 8'd200; #10;

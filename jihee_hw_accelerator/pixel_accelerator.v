@@ -26,7 +26,7 @@ module pixel_accelerator (
   	wire [8:0] r_brighten, g_brighten, b_brighten;
     wire [8:0] r_darken, g_darken, b_darken;
 
-    wire [9:0] gray:
+    wire [9:0] gray;
     assign gray = ({2'b0, r_in} >> 2) + ({2'b0, r_in} >> 4) + 
                   ({2'b0, g_in} >> 1) + ({2'b0, g_in} >> 4) +
                   ({2'b0, b_in} >> 4); 
