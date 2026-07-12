@@ -3,7 +3,7 @@
 // Each instance has its own baud_generator so three RX wires stay independent.
 
 module uart_rx_byte #(
-    parameter int CLOCK_FREQ = 12_000_000,
+    parameter int CLOCK_FREQ = 66_000_000,
     parameter int BAUD_RATE  = 115_200
 ) (
     input  logic       clk,

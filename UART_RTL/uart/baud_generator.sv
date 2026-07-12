@@ -3,7 +3,7 @@
 // sync_reset realigns the counter (used by RX on start-bit detection).
 
 module baud_generator #(
-    parameter int CLOCK_FREQ = 12_000_000,
+    parameter int CLOCK_FREQ = 66_000_000,  // iCE40-HX8K board clock (Hz)
     parameter int BAUD_RATE  = 115_200,
     localparam int CLKS_PER_BIT = CLOCK_FREQ / BAUD_RATE
 ) (

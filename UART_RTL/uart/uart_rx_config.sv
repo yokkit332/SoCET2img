@@ -2,7 +2,7 @@
 // UART receiver for mode/threshold configuration bytes.
 
 module uart_rx_config #(
-    parameter int CLOCK_FREQ = 12_000_000,
+    parameter int CLOCK_FREQ = 66_000_000,
     parameter int BAUD_RATE  = 115_200
 ) (
     input  logic       clk,

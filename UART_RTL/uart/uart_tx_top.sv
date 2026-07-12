@@ -4,7 +4,7 @@
 // Pixel Processor; output_ready from pixel_controller triggers all three.
 
 module uart_tx_top #(
-    parameter int CLOCK_FREQ = 12_000_000,
+    parameter int CLOCK_FREQ = 66_000_000,
     parameter int BAUD_RATE  = 115_200
 ) (
     input  logic        clk,

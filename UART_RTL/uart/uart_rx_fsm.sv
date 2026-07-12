@@ -3,7 +3,7 @@
 // pixel_controller acknowledges via output_ready.
 
 module uart_rx_fsm #(
-    parameter int CLOCK_FREQ = 12_000_000,
+    parameter int CLOCK_FREQ = 66_000_000,
     parameter int BAUD_RATE  = 115_200,
     localparam int CLKS_PER_BIT = CLOCK_FREQ / BAUD_RATE,
     localparam int HALF_CLKS    = CLKS_PER_BIT / 2
