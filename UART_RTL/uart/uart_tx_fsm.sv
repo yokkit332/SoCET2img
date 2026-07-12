@@ -9,7 +9,8 @@ module uart_tx_fsm (
     input  logic       baud_tick, // Bit-period timing pulse from baud_generator
     output logic       load,      // Load tx_data into shift register
     output logic       shift_en,  // Enable shift register on each data bit
-    output logic       tx_ready   // High when FSM can accept a new byte
+    output logic       tx_ready,   // High when FSM can accept a new byte
+    output logic [1:0] tx_state    // Current FSM state (for serial_tx mux)
 );
 
     // Transmitter FSM states
@@ -25,6 +26,7 @@ module uart_tx_fsm (
 
     // Bit counter: tracks progress through start/data/stop phases
     logic [3:0] bit_count;
+    assign tx_state = state;
 
     // -------------------------------------------------------------------------
     // State register

@@ -1,6 +1,6 @@
 // pixel_serializer.sv
-// Splits one 24-bit RGB888 pixel into three UART bytes for transmission.
-// Byte order: R [23:16], then G [15:8], then B [7:0].
+// [NOT USED] Legacy single-wire TX: split pixel_out[23:0] into sequential bytes.
+// Current design uses three parallel uart_tx_byte instances (R/G/B wires).
 
 module pixel_serializer (
     input  logic        clk,          // System clock

@@ -1,6 +1,7 @@
 // pixel_assembler.sv
-// Groups three consecutive UART bytes into one 24-bit RGB888 pixel.
-// Byte order: byte 0 = R [23:16], byte 1 = G [15:8], byte 2 = B [7:0].
+// [NOT USED] Legacy module for single-wire RX (3 sequential bytes -> pixel_in[23:0]).
+// Current design uses three parallel uart_rx_byte instances (R/G/B wires) instead.
+// Byte order was: byte 0 = R [23:16], byte 1 = G [15:8], byte 2 = B [7:0].
 
 module pixel_assembler (
     input  logic        clk,         // System clock
