@@ -2,16 +2,16 @@
 
 module pixel_accelerator (
   
-    input wire [7:0] r_in,
-    input wire [7:0] g_in,
-    input wire [7:0] b_in,
+    input logic [7:0] r_in,
+    input logic [7:0] g_in,
+    input logic [7:0] b_in,
     
-    input wire [2:0] mode_locked,
-    input wire [4:0] threshold_locked,
+    input logic [2:0] mode_locked,
+    input logic [4:0] threshold_locked,
 
-    output reg [7:0] r_out,
-    output reg [7:0] g_out,
-    output reg [7:0] b_out
+    output logic [7:0] r_out,
+    output logic [7:0] g_out,
+    output logic [7:0] b_out
 
 
 );
@@ -23,10 +23,10 @@ module pixel_accelerator (
     localparam MODE_GRAYSCALE   = 3'b100;
 
 
-  	wire [8:0] r_brighten, g_brighten, b_brighten;
-    wire [8:0] r_darken, g_darken, b_darken;
+  	logic [8:0] r_brighten, g_brighten, b_brighten;
+    logic [8:0] r_darken, g_darken, b_darken;
 
-    wire [9:0] gray;
+    logic [9:0] gray;
     assign gray = ({2'b0, r_in} >> 2) + ({2'b0, r_in} >> 4) + 
                   ({2'b0, g_in} >> 1) + ({2'b0, g_in} >> 4) +
                   ({2'b0, b_in} >> 4); 
@@ -45,7 +45,7 @@ module pixel_accelerator (
     
 
 
-    always @(*) begin
+    always_comb begin
         case (mode_locked)
             MODE_PASSTHROUGH: begin
                 r_out = r_in;
