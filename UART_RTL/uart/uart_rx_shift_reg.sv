@@ -17,7 +17,7 @@ module uart_rx_shift_reg (
     always_ff @(posedge clk, negedge n_rst) begin
         if (!n_rst) begin
             shift_reg <= 8'h00;
-        end else if (shift_en && baud_tick) begin
+        end else if (shift_en) begin
             shift_reg <= {serial_rx, shift_reg[7:1]};
         end
     end

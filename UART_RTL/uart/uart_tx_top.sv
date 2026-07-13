@@ -16,13 +16,14 @@ module uart_tx_top #(
     output logic        serial_tx_r,
     output logic        serial_tx_g,
     output logic        serial_tx_b,
-    output logic        tx_ready        // High when all three TX paths are idle
+    output logic        tx_ready,        // High when all three TX paths are idle
+    output logic        baud_tick
 );
 
-    logic baud_tick;
     logic tx_ready_r;
     logic tx_ready_g;
     logic tx_ready_b;
+    logic tx_baud_resync;
 
     assign tx_ready = tx_ready_r & tx_ready_g & tx_ready_b;
 
@@ -32,38 +33,50 @@ module uart_tx_top #(
     ) u_baud_gen (
         .clk         (clk),
         .n_rst       (n_rst),
-        .sync_reset  (1'b0),
+        .sync_reset  (tx_baud_resync),
         .baud_tick   (baud_tick)
     );
 
-    uart_tx_byte u_tx_r (
+    uart_tx_byte #(
+        .CLOCK_FREQ(CLOCK_FREQ),
+        .BAUD_RATE (BAUD_RATE)
+    ) u_tx_r (
         .clk          (clk),
         .n_rst        (n_rst),
         .baud_tick    (baud_tick),
         .px_in        (r_out),
         .output_ready (output_ready),
         .serial_tx    (serial_tx_r),
-        .tx_ready     (tx_ready_r)
+        .tx_ready     (tx_ready_r),
+        .baud_resync  (tx_baud_resync)
     );
 
-    uart_tx_byte u_tx_g (
+    uart_tx_byte #(
+        .CLOCK_FREQ(CLOCK_FREQ),
+        .BAUD_RATE (BAUD_RATE)
+    ) u_tx_g (
         .clk          (clk),
         .n_rst        (n_rst),
         .baud_tick    (baud_tick),
         .px_in        (g_out),
         .output_ready (output_ready),
         .serial_tx    (serial_tx_g),
-        .tx_ready     (tx_ready_g)
+        .tx_ready     (tx_ready_g),
+        .baud_resync  ()
     );
 
-    uart_tx_byte u_tx_b (
+    uart_tx_byte #(
+        .CLOCK_FREQ(CLOCK_FREQ),
+        .BAUD_RATE (BAUD_RATE)
+    ) u_tx_b (
         .clk          (clk),
         .n_rst        (n_rst),
         .baud_tick    (baud_tick),
         .px_in        (b_out),
         .output_ready (output_ready),
         .serial_tx    (serial_tx_b),
-        .tx_ready     (tx_ready_b)
+        .tx_ready     (tx_ready_b),
+        .baud_resync  ()
     );
 
 endmodule
