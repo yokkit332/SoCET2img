@@ -16,6 +16,7 @@ module image_accelerator (
     localparam MODE_BRIGHTEN    = 2'b10;
     localparam MODE_DARKEN      = 2'b11;
 
+
     wire [8:0] brighten_result;
     wire [8:0] darken_result;
 

@@ -1,9 +1,8 @@
-module control_unit(
+module pixel_controller(
     input logic clk, n_rst, 
-    input logic r_ready, g_ready, b_ready, 
-    input logic confirm, 
-    input logic [2:0] mode_in,
-    input logic [4:0] threshold_in,
+    input logic r_ready, g_ready, b_ready,
+    input logic config_ready, 
+    input logic [7:0] config_byte,
     output logic [2:0] mode_locked,
     output logic [4:0] threshold_locked,
     output logic output_ready
@@ -70,16 +69,21 @@ module control_unit(
 
     // mode and threshold combinational block
     always_comb begin
+
         // lock the registers if we are not in an input state
         mode_next = mode_locked;
         threshold_next = threshold_locked;
 
         // accept mode or threshold inputs only if we are in the input mode or threshold states
         if(state == INPUT_MODE) begin
-            mode_next = mode_in;
+            if(config_ready) begin
+                mode_next = config_byte[2:0];
+            end
         end
         else if(state == INPUT_THRESHOLD) begin
-            threshold_next = threshold_in;
+            if(config_ready) begin
+                threshold_next = config_byte[4:0];
+            end
         end
     end
 
@@ -98,15 +102,16 @@ module control_unit(
     // next state logic block
     always_comb begin
         case(state) 
-            INPUT_MODE: next_state = confirm ? INPUT_THRESHOLD : INPUT_MODE;
-            INPUT_THRESHOLD: next_state = confirm ? STREAM : INPUT_THRESHOLD;
-            STREAM: next_state = (rollover) ? INPUT_MODE : STREAM;
+            INPUT_MODE: next_state = state_t'(config_ready ? INPUT_THRESHOLD : INPUT_MODE);
+            INPUT_THRESHOLD: next_state = state_t'(config_ready ? STREAM : INPUT_THRESHOLD);
+            STREAM: next_state = state_t'(rollover ? INPUT_MODE : STREAM);
             default: next_state = INPUT_MODE;
         endcase
     end
 
     // output logic block
     always_comb begin
+        output_ready = '0;
         case(state) 
             // in stream state, assert output_ready if the rgb uart bytes have all been shifted in
             STREAM: output_ready = r_ready & g_ready & b_ready;
