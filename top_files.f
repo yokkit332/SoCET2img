@@ -1,0 +1,15 @@
+top.sv
+pixel_controller.sv
+jihee_hw_accelerator/pixel_accelerator.sv
+UART_RTL/uart/baud_generator.sv
+UART_RTL/uart/uart_rx_sync.sv
+UART_RTL/uart/uart_rx_shift_reg.sv
+UART_RTL/uart/uart_rx_fsm.sv
+UART_RTL/uart/uart_rx_byte.sv
+UART_RTL/uart/uart_rx_config.sv
+UART_RTL/uart/uart_rx_top.sv
+UART_RTL/uart/uart_tx_shift_reg.sv
+UART_RTL/uart/uart_tx_fsm.sv
+UART_RTL/uart/uart_tx_byte.sv
+UART_RTL/uart/uart_tx_top.sv
+top_tb.sv

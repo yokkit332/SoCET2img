@@ -45,6 +45,7 @@ module pixel_controller(
         rollover_next = '0;
         // 4799 since the count starts at 0
         // 80x60 brings us 4800 pixels, but transition at 4799 b/c we start at 0
+        
         if(pixelCount == 13'd4799) begin
             pixelCount_next = '0;
             rollover_next = '1;
