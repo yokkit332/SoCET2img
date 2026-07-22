@@ -1,13 +1,13 @@
 // uart_tx_shift_reg.sv
-// Parallel-to-serial converter for UART transmission.
+// holds the byte and shifts it out LSB first
 
 module uart_tx_shift_reg (
-    input  logic       clk,
-    input  logic       n_rst,
+    input  logic clk,
+    input  logic n_rst,
     input  logic [7:0] tx_data,
-    input  logic       load,
-    input  logic       baud_tick,  // unused; kept for interface compatibility
-    input  logic       shift_en,
+    input  logic load,
+    input  logic baud_tick, // unused, left for port compatibility
+    input  logic shift_en,
     output logic [7:0] shift_out
 );
 
@@ -17,9 +17,9 @@ module uart_tx_shift_reg (
         if (!n_rst)
             shift_reg <= 8'h00;
         else if (load)
-            shift_reg <= tx_data;
+            shift_reg <= tx_data; // grab the byte
         else if (shift_en)
-            shift_reg <= shift_reg >> 1;
+            shift_reg <= shift_reg >> 1; // next bit falls into [0]
     end
 
     assign shift_out = shift_reg;

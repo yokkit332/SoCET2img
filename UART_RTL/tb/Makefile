@@ -1,8 +1,10 @@
 # UART testbench simulation helpers (Icarus Verilog + GTKWave)
 #
 # Usage (from UART_RTL/tb/):
-#   make tx       -> run TX testbench, open waveform
+#   make all      -> run TX, RX, config, and loopback (fails on $fatal)
+#   make tx       -> run TX testbench
 #   make rx       -> run RX testbench
+#   make config   -> run RX config testbench
 #   make loopback -> run TX->RX loopback testbench
 #
 # Requirements: iverilog, vvp, gtkwave (optional target)
@@ -23,21 +25,26 @@ RTL_SRCS  = $(RTL_DIR)/baud_generator.sv \
             $(RTL_DIR)/uart_rx_fsm.sv \
             $(RTL_DIR)/uart_rx_shift_reg.sv \
             $(RTL_DIR)/uart_rx_byte.sv \
-            $(RTL_DIR)/uart_rx_top.sv
+            $(RTL_DIR)/uart_rx_top.sv \
+            $(RTL_DIR)/uart_rx_config.sv
 
 TX_TB     = tb_uart_tx.sv
 RX_TB     = tb_uart_rx.sv
+CFG_TB    = tb_uart_rx_config.sv
 LOOP_TB   = tb_uart_loopback.sv
 
-.PHONY: all tx rx loopback clean wave_tx wave_rx wave_loop
+.PHONY: all tx rx config loopback clean wave_tx wave_rx wave_config wave_loop
 
-all: tx
+all: tx rx config loopback
 
 tx: sim_tx
 	$(VVP) sim_tx
 
 rx: sim_rx
 	$(VVP) sim_rx
+
+config: sim_config
+	$(VVP) sim_config
 
 loopback: sim_loop
 	$(VVP) sim_loop
@@ -48,6 +55,9 @@ sim_tx: $(TX_TB) $(RTL_SRCS)
 sim_rx: $(RX_TB) $(RTL_SRCS)
 	$(IVERILOG) $(SV_FLAGS) -o sim_rx $(RTL_SRCS) $(RX_TB)
 
+sim_config: $(CFG_TB) $(RTL_SRCS)
+	$(IVERILOG) $(SV_FLAGS) -o sim_config $(RTL_SRCS) $(CFG_TB)
+
 sim_loop: $(LOOP_TB) $(RTL_SRCS)
 	$(IVERILOG) $(SV_FLAGS) -o sim_loop $(RTL_SRCS) $(LOOP_TB)
 
@@ -57,8 +67,11 @@ wave_tx: tx
 wave_rx: rx
 	$(GTKWAVE) tb_uart_rx.vcd
 
+wave_config: config
+	$(GTKWAVE) tb_uart_rx_config.vcd
+
 wave_loop: loopback
 	$(GTKWAVE) tb_uart_loopback.vcd
 
 clean:
-	rm -f sim_tx sim_rx sim_loop *.vcd
+	rm -f sim_tx sim_rx sim_config sim_loop *.vcd
