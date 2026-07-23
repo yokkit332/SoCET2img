@@ -1,77 +1,109 @@
-# UART testbench simulation helpers (Icarus Verilog + GTKWave)
+# UART testbench helpers (Icarus + GTKWave)
 #
-# Usage (from UART_RTL/tb/):
-#   make all      -> run TX, RX, config, and loopback (fails on $fatal)
-#   make tx       -> run TX testbench
-#   make rx       -> run RX testbench
-#   make config   -> run RX config testbench
-#   make loopback -> run TX->RX loopback testbench
+# From UART_RTL/tb/:
+#   make all    - run every TB
+#   make tops   - just the top-level ones (tx/rx/config/loopback)
+#   make units  - just the unit TBs
 #
-# Requirements: iverilog, vvp, gtkwave (optional target)
+# Examples: make baud, make rx_fsm, make tx_byte, ...
 
-IVERILOG  = iverilog
-VVP       = vvp
-GTKWAVE   = gtkwave
+IVERILOG = iverilog
+VVP      = vvp
+GTKWAVE  = gtkwave
 
-RTL_DIR   = ../uart
-SV_FLAGS  = -g2012
+RTL_DIR  = ../uart
+SV_FLAGS = -g2012
 
-RTL_SRCS  = $(RTL_DIR)/baud_generator.sv \
-            $(RTL_DIR)/uart_tx_fsm.sv \
-            $(RTL_DIR)/uart_tx_shift_reg.sv \
-            $(RTL_DIR)/uart_tx_byte.sv \
-            $(RTL_DIR)/uart_tx_top.sv \
-            $(RTL_DIR)/uart_rx_sync.sv \
-            $(RTL_DIR)/uart_rx_fsm.sv \
-            $(RTL_DIR)/uart_rx_shift_reg.sv \
-            $(RTL_DIR)/uart_rx_byte.sv \
-            $(RTL_DIR)/uart_rx_top.sv \
-            $(RTL_DIR)/uart_rx_config.sv
+# all RTL (some unit TBs only need a subset but this is simple)
+RTL_SRCS = $(RTL_DIR)/baud_generator.sv \
+           $(RTL_DIR)/uart_tx_fsm.sv \
+           $(RTL_DIR)/uart_tx_shift_reg.sv \
+           $(RTL_DIR)/uart_tx_byte.sv \
+           $(RTL_DIR)/uart_tx_top.sv \
+           $(RTL_DIR)/uart_rx_sync.sv \
+           $(RTL_DIR)/uart_rx_fsm.sv \
+           $(RTL_DIR)/uart_rx_shift_reg.sv \
+           $(RTL_DIR)/uart_rx_byte.sv \
+           $(RTL_DIR)/uart_rx_top.sv \
+           $(RTL_DIR)/uart_rx_config.sv
 
-TX_TB     = tb_uart_tx.sv
-RX_TB     = tb_uart_rx.sv
-CFG_TB    = tb_uart_rx_config.sv
-LOOP_TB   = tb_uart_loopback.sv
+.PHONY: all tops units clean \
+        tx rx config loopback \
+        baud rx_sync rx_shift tx_shift rx_fsm tx_fsm rx_byte tx_byte
 
-.PHONY: all tx rx config loopback clean wave_tx wave_rx wave_config wave_loop
+all: units tops
 
-all: tx rx config loopback
+tops: tx rx config loopback
 
+units: baud rx_sync rx_shift tx_shift tx_fsm rx_fsm tx_byte rx_byte
+
+# ----- top level -----
 tx: sim_tx
 	$(VVP) sim_tx
-
 rx: sim_rx
 	$(VVP) sim_rx
-
 config: sim_config
 	$(VVP) sim_config
-
 loopback: sim_loop
 	$(VVP) sim_loop
 
-sim_tx: $(TX_TB) $(RTL_SRCS)
-	$(IVERILOG) $(SV_FLAGS) -o sim_tx $(RTL_SRCS) $(TX_TB)
+sim_tx: tb_uart_tx.sv $(RTL_SRCS)
+	$(IVERILOG) $(SV_FLAGS) -o sim_tx $(RTL_SRCS) tb_uart_tx.sv
+sim_rx: tb_uart_rx.sv $(RTL_SRCS)
+	$(IVERILOG) $(SV_FLAGS) -o sim_rx $(RTL_SRCS) tb_uart_rx.sv
+sim_config: tb_uart_rx_config.sv $(RTL_SRCS)
+	$(IVERILOG) $(SV_FLAGS) -o sim_config $(RTL_SRCS) tb_uart_rx_config.sv
+sim_loop: tb_uart_loopback.sv $(RTL_SRCS)
+	$(IVERILOG) $(SV_FLAGS) -o sim_loop $(RTL_SRCS) tb_uart_loopback.sv
 
-sim_rx: $(RX_TB) $(RTL_SRCS)
-	$(IVERILOG) $(SV_FLAGS) -o sim_rx $(RTL_SRCS) $(RX_TB)
+# ----- unit -----
+baud: sim_baud
+	$(VVP) sim_baud
+rx_sync: sim_rx_sync
+	$(VVP) sim_rx_sync
+rx_shift: sim_rx_shift
+	$(VVP) sim_rx_shift
+tx_shift: sim_tx_shift
+	$(VVP) sim_tx_shift
+tx_fsm: sim_tx_fsm
+	$(VVP) sim_tx_fsm
+rx_fsm: sim_rx_fsm
+	$(VVP) sim_rx_fsm
+tx_byte: sim_tx_byte
+	$(VVP) sim_tx_byte
+rx_byte: sim_rx_byte
+	$(VVP) sim_rx_byte
 
-sim_config: $(CFG_TB) $(RTL_SRCS)
-	$(IVERILOG) $(SV_FLAGS) -o sim_config $(RTL_SRCS) $(CFG_TB)
+sim_baud: tb_baud_generator.sv $(RTL_DIR)/baud_generator.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_baud $(RTL_DIR)/baud_generator.sv tb_baud_generator.sv
 
-sim_loop: $(LOOP_TB) $(RTL_SRCS)
-	$(IVERILOG) $(SV_FLAGS) -o sim_loop $(RTL_SRCS) $(LOOP_TB)
+sim_rx_sync: tb_uart_rx_sync.sv $(RTL_DIR)/uart_rx_sync.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_rx_sync $(RTL_DIR)/uart_rx_sync.sv tb_uart_rx_sync.sv
 
-wave_tx: tx
-	$(GTKWAVE) tb_uart_tx.vcd
+sim_rx_shift: tb_uart_rx_shift_reg.sv $(RTL_DIR)/uart_rx_shift_reg.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_rx_shift $(RTL_DIR)/uart_rx_shift_reg.sv tb_uart_rx_shift_reg.sv
 
-wave_rx: rx
-	$(GTKWAVE) tb_uart_rx.vcd
+sim_tx_shift: tb_uart_tx_shift_reg.sv $(RTL_DIR)/uart_tx_shift_reg.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_tx_shift $(RTL_DIR)/uart_tx_shift_reg.sv tb_uart_tx_shift_reg.sv
 
-wave_config: config
-	$(GTKWAVE) tb_uart_rx_config.vcd
+sim_tx_fsm: tb_uart_tx_fsm.sv $(RTL_DIR)/uart_tx_fsm.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_tx_fsm $(RTL_DIR)/uart_tx_fsm.sv tb_uart_tx_fsm.sv
 
-wave_loop: loopback
-	$(GTKWAVE) tb_uart_loopback.vcd
+sim_rx_fsm: tb_uart_rx_fsm.sv $(RTL_DIR)/uart_rx_fsm.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_rx_fsm $(RTL_DIR)/uart_rx_fsm.sv tb_uart_rx_fsm.sv
+
+sim_tx_byte: tb_uart_tx_byte.sv $(RTL_DIR)/baud_generator.sv $(RTL_DIR)/uart_tx_fsm.sv \
+             $(RTL_DIR)/uart_tx_shift_reg.sv $(RTL_DIR)/uart_tx_byte.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_tx_byte \
+	  $(RTL_DIR)/baud_generator.sv $(RTL_DIR)/uart_tx_fsm.sv \
+	  $(RTL_DIR)/uart_tx_shift_reg.sv $(RTL_DIR)/uart_tx_byte.sv \
+	  tb_uart_tx_byte.sv
+
+sim_rx_byte: tb_uart_rx_byte.sv $(RTL_SRCS)
+	$(IVERILOG) $(SV_FLAGS) -o sim_rx_byte $(RTL_SRCS) tb_uart_rx_byte.sv
 
 clean:
-	rm -f sim_tx sim_rx sim_config sim_loop *.vcd
+	rm -f sim_tx sim_rx sim_config sim_loop \
+	      sim_baud sim_rx_sync sim_rx_shift sim_tx_shift \
+	      sim_tx_fsm sim_rx_fsm sim_tx_byte sim_rx_byte \
+	      *.vcd
