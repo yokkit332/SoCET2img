@@ -32,13 +32,11 @@ module pixel_accelerator (
                   ({2'b0, b_in} >> 4); 
 
 
-//    assign brighten_result = {2'b00, pixel_in} + {5'b0, threshold};
     assign r_brighten = {1'b0, r_in} + {4'b0, threshold_locked};
     assign g_brighten = {1'b0, g_in} + {4'b0, threshold_locked};
     assign b_brighten = {1'b0, b_in} + {4'b0, threshold_locked};
 
 
-//    assign darken_result   = {2'b00, pixel_in} - {5'b0, threshold};
     assign r_darken = {1'b0, r_in} - {4'b0, threshold_locked};
     assign g_darken = {1'b0, g_in} - {4'b0, threshold_locked};
     assign b_darken = {1'b0, b_in} - {4'b0, threshold_locked};
