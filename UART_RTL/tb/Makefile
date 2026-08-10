@@ -25,17 +25,22 @@ RTL_SRCS = $(RTL_DIR)/baud_generator.sv \
            $(RTL_DIR)/uart_rx_shift_reg.sv \
            $(RTL_DIR)/uart_rx_byte.sv \
            $(RTL_DIR)/uart_rx_top.sv \
-           $(RTL_DIR)/uart_rx_config.sv
+           $(RTL_DIR)/uart_rx_config.sv \
+           $(RTL_DIR)/uart_stream_decoder.sv \
+           $(RTL_DIR)/uart_rgb_serializer.sv
 
-.PHONY: all tops units clean \
+.PHONY: all tops units stream clean \
         tx rx config loopback \
-        baud rx_sync rx_shift tx_shift rx_fsm tx_fsm rx_byte tx_byte
+        baud rx_sync rx_shift tx_shift rx_fsm tx_fsm rx_byte tx_byte \
+        decoder serializer
 
-all: units tops
+all: units tops stream
 
 tops: tx rx config loopback
 
 units: baud rx_sync rx_shift tx_shift tx_fsm rx_fsm tx_byte rx_byte
+
+stream: decoder serializer
 
 # ----- top level -----
 tx: sim_tx
@@ -102,8 +107,34 @@ sim_tx_byte: tb_uart_tx_byte.sv $(RTL_DIR)/baud_generator.sv $(RTL_DIR)/uart_tx_
 sim_rx_byte: tb_uart_rx_byte.sv $(RTL_SRCS)
 	$(IVERILOG) $(SV_FLAGS) -o sim_rx_byte $(RTL_SRCS) tb_uart_rx_byte.sv
 
+# ----- single-wire stream helpers -----
+decoder: sim_decoder
+	$(VVP) sim_decoder
+
+serializer: sim_serializer
+	$(VVP) sim_serializer
+
+sim_decoder: tb_uart_stream_decoder.sv $(RTL_DIR)/uart_stream_decoder.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_decoder \
+	  $(RTL_DIR)/uart_stream_decoder.sv tb_uart_stream_decoder.sv
+
+sim_serializer: tb_uart_rgb_serializer.sv \
+                $(RTL_DIR)/baud_generator.sv \
+                $(RTL_DIR)/uart_tx_fsm.sv \
+                $(RTL_DIR)/uart_tx_shift_reg.sv \
+                $(RTL_DIR)/uart_tx_byte.sv \
+                $(RTL_DIR)/uart_rgb_serializer.sv
+	$(IVERILOG) $(SV_FLAGS) -o sim_serializer \
+	  $(RTL_DIR)/baud_generator.sv \
+	  $(RTL_DIR)/uart_tx_fsm.sv \
+	  $(RTL_DIR)/uart_tx_shift_reg.sv \
+	  $(RTL_DIR)/uart_tx_byte.sv \
+	  $(RTL_DIR)/uart_rgb_serializer.sv \
+	  tb_uart_rgb_serializer.sv
+
 clean:
 	rm -f sim_tx sim_rx sim_config sim_loop \
 	      sim_baud sim_rx_sync sim_rx_shift sim_tx_shift \
 	      sim_tx_fsm sim_rx_fsm sim_tx_byte sim_rx_byte \
+	      sim_decoder sim_serializer \
 	      *.vcd
