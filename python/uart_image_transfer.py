@@ -1,12 +1,12 @@
 # uart_image_transfer.py
-# One-wire host tool for the SoCET2img UART stream protocol.
+# 3-wire RGB (+ config) host tool for SoCET2img.
 #
-# Always sends:
-#   A0, mode, A1, threshold, A2, then R,G,B,... pixels from a .mem file
+# Send path:
+#   1) config UART: mode byte, then threshold byte
+#   2) for each pixel: write R, G, B on the three RGB UARTs
 #
-# By default also receives the processed frame on the same COM port
-# (FPGA serial_tx -> PC RX), writes a .mem, and makes a PNG.
-# Use --send-only to skip receive (old send_uart.py behavior).
+# Optional receive on tx-r / tx-g / tx-b -> .mem + PNG
+# Use --send-only to skip receive.
 
 from __future__ import annotations
 
@@ -20,25 +20,18 @@ import serial
 from hex_to_png import mem_to_png
 
 
-CMD_MODE = 0xA0
-CMD_THRESHOLD = 0xA1
-CMD_FRAME_START = 0xA2
-
-
-def read_mem_file(path: Path, expected_pixels: int) -> bytes:
-    payload = bytearray()
+def read_mem_pixels(path: Path, expected_pixels: int) -> list[tuple[int, int, int]]:
+    pixels: list[tuple[int, int, int]] = []
 
     for line_number, original_line in enumerate(
         path.read_text().splitlines(),
         start=1,
     ):
         line = original_line.split("//", 1)[0].split("#", 1)[0].strip()
-
         if not line or line.startswith("@"):
             continue
 
         token = line.split()[0]
-
         if token.lower().startswith("0x"):
             token = token[2:]
 
@@ -54,7 +47,7 @@ def read_mem_file(path: Path, expected_pixels: int) -> bytes:
                 f"Line {line_number}: invalid hexadecimal pixel {token!r}"
             ) from error
 
-        payload.extend(
+        pixels.append(
             (
                 (pixel >> 16) & 0xFF,
                 (pixel >> 8) & 0xFF,
@@ -62,59 +55,58 @@ def read_mem_file(path: Path, expected_pixels: int) -> bytes:
             )
         )
 
-    actual_pixels = len(payload) // 3
-    if actual_pixels != expected_pixels:
+    if len(pixels) != expected_pixels:
         raise ValueError(
-            f"Expected {expected_pixels} pixels, found {actual_pixels}"
+            f"Expected {expected_pixels} pixels, found {len(pixels)}"
         )
 
-    return bytes(payload)
+    return pixels
 
 
-def write_mem_file(path: Path, data: bytes) -> None:
-    if len(data) % 3 != 0:
-        raise ValueError("Received byte count is not divisible by three")
-
-    lines = [
-        f"{data[i]:02X}{data[i + 1]:02X}{data[i + 2]:02X}"
-        for i in range(0, len(data), 3)
-    ]
+def write_mem_file(path: Path, pixels: list[tuple[int, int, int]]) -> None:
+    lines = [f"{r:02X}{g:02X}{b:02X}" for r, g, b in pixels]
     path.write_text("\n".join(lines) + "\n")
 
 
-def receive_exact(
-    uart: serial.Serial,
-    byte_count: int,
+def open_port(name: str, baud: int, timeout: float) -> serial.Serial:
+    return serial.Serial(
+        port=name,
+        baudrate=baud,
+        bytesize=serial.EIGHTBITS,
+        parity=serial.PARITY_NONE,
+        stopbits=serial.STOPBITS_ONE,
+        timeout=timeout,
+        write_timeout=timeout,
+    )
+
+
+def receive_pixels(
+    tx_r: serial.Serial,
+    tx_g: serial.Serial,
+    tx_b: serial.Serial,
+    n: int,
     timeout_seconds: float,
-) -> bytes:
-    received = bytearray()
+) -> list[tuple[int, int, int]]:
+    out: list[tuple[int, int, int]] = []
     deadline = time.monotonic() + timeout_seconds
 
-    while len(received) < byte_count:
-        remaining = byte_count - len(received)
-        chunk = uart.read(min(4096, remaining))
-
-        if chunk:
-            received.extend(chunk)
-            deadline = time.monotonic() + timeout_seconds
-        elif time.monotonic() >= deadline:
+    while len(out) < n:
+        if time.monotonic() >= deadline:
             raise TimeoutError(
-                f"Received {len(received)} of {byte_count} bytes before timeout"
+                f"Received {len(out)} of {n} pixels before timeout"
             )
 
-    return bytes(received)
+        if tx_r.in_waiting and tx_g.in_waiting and tx_b.in_waiting:
+            r = tx_r.read(1)
+            g = tx_g.read(1)
+            b = tx_b.read(1)
+            if len(r) and len(g) and len(b):
+                out.append((r[0], g[0], b[0]))
+                deadline = time.monotonic() + timeout_seconds
+        else:
+            time.sleep(0.0005)
 
-
-def build_header(mode: int, threshold: int) -> bytes:
-    return bytes(
-        (
-            CMD_MODE,
-            mode & 0xFF,
-            CMD_THRESHOLD,
-            threshold & 0xFF,
-            CMD_FRAME_START,
-        )
-    )
+    return out
 
 
 def transfer_image(args: argparse.Namespace) -> None:
@@ -122,38 +114,49 @@ def transfer_image(args: argparse.Namespace) -> None:
         raise ValueError("Mode must be between 0 and 7")
     if not 0 <= args.threshold <= 31:
         raise ValueError("Threshold must be between 0 and 31")
-    if args.width <= 0 or args.height <= 0:
-        raise ValueError("Width and height must be positive")
 
     expected_pixels = args.width * args.height
-    expected_output_bytes = expected_pixels * 3
-    payload = read_mem_file(args.input, expected_pixels)
-    header = build_header(args.mode, args.threshold)
+    pixels = read_mem_pixels(args.input, expected_pixels)
 
-    receive_result: dict[str, bytes] = {}
-    receive_error: dict[str, BaseException] = {}
+    ports: list[serial.Serial] = []
+    try:
+        port_r = open_port(args.port_r, args.baud, args.timeout)
+        port_g = open_port(args.port_g, args.baud, args.timeout)
+        port_b = open_port(args.port_b, args.baud, args.timeout)
+        port_cfg = open_port(args.port_cfg, args.baud, args.timeout)
+        ports.extend([port_r, port_g, port_b, port_cfg])
 
-    with serial.Serial(
-        port=args.port,
-        baudrate=args.baud,
-        bytesize=serial.EIGHTBITS,
-        parity=serial.PARITY_NONE,
-        stopbits=serial.STOPBITS_ONE,
-        timeout=0.1,
-        write_timeout=args.timeout,
-    ) as uart:
-        time.sleep(args.startup_delay)
-        uart.reset_input_buffer()
-        uart.reset_output_buffer()
-
-        receive_thread = None
+        tx_ports = None
         if not args.send_only:
+            if not (args.tx_r and args.tx_g and args.tx_b):
+                raise ValueError(
+                    "Provide --tx-r/--tx-g/--tx-b, or pass --send-only"
+                )
+            tx_r = open_port(args.tx_r, args.baud, 0.1)
+            tx_g = open_port(args.tx_g, args.baud, 0.1)
+            tx_b = open_port(args.tx_b, args.baud, 0.1)
+            ports.extend([tx_r, tx_g, tx_b])
+            tx_r.reset_input_buffer()
+            tx_g.reset_input_buffer()
+            tx_b.reset_input_buffer()
+            tx_ports = (tx_r, tx_g, tx_b)
+
+        time.sleep(args.startup_delay)
+        for p in (port_r, port_g, port_b, port_cfg):
+            p.reset_input_buffer()
+            p.reset_output_buffer()
+
+        receive_result: dict[str, list[tuple[int, int, int]]] = {}
+        receive_error: dict[str, BaseException] = {}
+        receive_thread = None
+
+        if tx_ports is not None:
             def reader() -> None:
                 try:
-                    receive_result["data"] = receive_exact(
-                        uart=uart,
-                        byte_count=expected_output_bytes,
-                        timeout_seconds=args.timeout,
+                    receive_result["pixels"] = receive_pixels(
+                        *tx_ports,
+                        expected_pixels,
+                        args.timeout,
                     )
                 except BaseException as error:
                     receive_error["error"] = error
@@ -161,29 +164,43 @@ def transfer_image(args: argparse.Namespace) -> None:
             receive_thread = threading.Thread(target=reader, daemon=True)
             receive_thread.start()
 
-        uart.write(header)
-        for start in range(0, len(payload), args.chunk_size):
-            uart.write(payload[start:start + args.chunk_size])
-        uart.flush()
+        # config: mode, then threshold (pixel_controller sequence)
+        port_cfg.write(bytes([args.mode & 0x07]))
+        port_cfg.flush()
+        time.sleep(args.byte_gap)
+
+        port_cfg.write(bytes([args.threshold & 0x1F]))
+        port_cfg.flush()
+        time.sleep(args.byte_gap)
+
+        # RGB pixels in parallel on 3 UARTs
+        for r, g, b in pixels:
+            port_r.write(bytes([r]))
+            port_g.write(bytes([g]))
+            port_b.write(bytes([b]))
+            time.sleep(args.pixel_gap)
+
+        port_r.flush()
+        port_g.flush()
+        port_b.flush()
 
         print(f"Sent mode={args.mode} threshold={args.threshold}")
-        print(f"Sent {expected_pixels} pixels ({len(payload)} RGB bytes) from {args.input}")
+        print(f"Sent {expected_pixels} pixels from {args.input}")
 
         if args.send_only:
             return
 
         assert receive_thread is not None
         receive_thread.join(args.timeout + 5.0)
-
         if receive_thread.is_alive():
             raise TimeoutError("Receiver thread did not finish")
         if "error" in receive_error:
             raise receive_error["error"]
-        if "data" not in receive_result:
+        if "pixels" not in receive_result:
             raise RuntimeError("No processed image was received")
 
-        output_data = receive_result["data"]
-        write_mem_file(args.output, output_data)
+        out_pixels = receive_result["pixels"]
+        write_mem_file(args.output, out_pixels)
 
         png_output = (
             args.png_output
@@ -201,27 +218,54 @@ def transfer_image(args: argparse.Namespace) -> None:
         print(f"Wrote {args.output}")
         print(f"Wrote {png_output}")
 
+    finally:
+        for p in ports:
+            try:
+                p.close()
+            except Exception:
+                pass
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Send (and optionally receive) an image over 1-wire UART"
+        description="Send/receive image over 3 RGB UARTs + config UART"
     )
-    parser.add_argument("--port", required=True)
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--output", type=Path, default=Path("processed_image.mem"))
     parser.add_argument("--png-output", type=Path, default=None)
+
+    parser.add_argument("--port-r", required=True, help="COM port -> rx_r")
+    parser.add_argument("--port-g", required=True, help="COM port -> rx_g")
+    parser.add_argument("--port-b", required=True, help="COM port -> rx_b")
+    parser.add_argument("--port-cfg", required=True, help="COM port -> rx_config")
+
+    parser.add_argument("--tx-r", help="COM port <- tx_r")
+    parser.add_argument("--tx-g", help="COM port <- tx_g")
+    parser.add_argument("--tx-b", help="COM port <- tx_b")
+
     parser.add_argument("--mode", type=int, required=True)
     parser.add_argument("--threshold", type=int, required=True)
     parser.add_argument("--width", type=int, default=80)
     parser.add_argument("--height", type=int, default=60)
     parser.add_argument("--baud", type=int, default=115200)
-    parser.add_argument("--timeout", type=float, default=10.0)
+    parser.add_argument("--timeout", type=float, default=30.0)
     parser.add_argument("--startup-delay", type=float, default=0.25)
-    parser.add_argument("--chunk-size", type=int, default=1024)
+    parser.add_argument(
+        "--byte-gap",
+        type=float,
+        default=0.002,
+        help="delay after each config byte",
+    )
+    parser.add_argument(
+        "--pixel-gap",
+        type=float,
+        default=0.001,
+        help="delay after each RGB pixel write",
+    )
     parser.add_argument(
         "--send-only",
         action="store_true",
-        help="only send to the chip (no TX capture / .mem / PNG)",
+        help="only send (no TX capture)",
     )
     return parser
 
